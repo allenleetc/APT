@@ -91,7 +91,7 @@ def rescale_points(locs_hires, scalex, scaley):
     locs_lores[..., 0] = (locs_lores[..., 0] - float(scalex - 1) / 2) / scalex
     locs_lores[..., 1] = (locs_lores[..., 1] - float(scaley - 1) / 2) / scaley
     locs_lores[~nan_valid] = np.nan
-    locs_lores[~high_valid] = -100000
+    locs_lores[~high_valid & nan_valid] = -100000
 
     if reduce_dim:
         locs_lores = locs_lores[:,0,...]

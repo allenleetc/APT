@@ -185,7 +185,7 @@ def find_peaks(map, thre):
 
     return peaks_with_score
 
-def create_label_hmap(locs, imsz, sigma, clip=0.05):
+def create_label_hmap(locs, imsz, sigma, clip=0.05, usefmax=False):
     """
     Create/return target hmap for parts
 
@@ -195,9 +195,13 @@ def create_label_hmap(locs, imsz, sigma, clip=0.05):
                     relative to "bin centers"; and may vary greatly if ctr loc approaches edge of im
     - Gaussian has subpx placement and is not centered precisely at a pixel center
 
-    locs: (nbatch x npts x 2) (x,y) locs, 0-based. (0,0) is the center of the upper-left pixel.
+    locs: (nbatch x npts x 2) (x,y) locs, 0-based. (0,0) is the center of the upper-left pixel. OR
+          (nbatch x ntgts x npts x 2). Same but with multiple tgts; generated hmap is maximum of tgt-wise hmaps
     imsz: [2] (nr, nc) size of heatmap to return
     """
+
+    maxfcn = np.fmax if usefmax else np.maximum
+
     locs = locs.copy()
     if locs.ndim == 3:
         locs = locs[:,np.newaxis,...]
@@ -212,14 +216,14 @@ def create_label_hmap(locs, imsz, sigma, clip=0.05):
                 x0 = locs[cur, mndx, ndx, 0]
                 y0 = locs[cur, mndx, ndx, 1]
                 assert not (np.isnan(x0) or np.isnan(y0) or np.isinf(x0) or np.isinf(y0))
-                if (x0< -1000) or (y0 < -1000):
+                if (x0 < -1000) or (y0 < -1000):
                     continue
 
                 dx = x - x0
                 dy = y - y0
                 d2 = dx**2 + dy**2
                 exp = -d2 / 2.0 / sigma / sigma
-                out[cur, :, :, ndx] =np.maximum(out[cur,:,:,ndx],np.exp(exp))
+                out[cur, :, :, ndx] = maxfcn(out[cur, :, :, ndx], np.exp(exp))
     out[out < clip] = 0.
 
     return out

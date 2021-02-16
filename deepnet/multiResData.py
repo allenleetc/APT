@@ -1150,8 +1150,11 @@ def read_and_decode_without_session_multi(filename, n_classes):
         img_1d = np.fromstring(img_string, dtype=np.uint8)
         reconstructed_img = img_1d.reshape((height, width, depth))
         mask_string = example.features.feature['mask'].bytes_list.value[0]
-        mask_1d = np.fromstring(mask_string, dtype=np.uint8)
-        mask = mask_1d.reshape((height, width))
+        if mask_string:
+            mask_1d = np.fromstring(mask_string, dtype=np.uint8)
+            mask = mask_1d.reshape((height, width))
+        else:
+            mask = None
 
         locs = np.array(example.features.feature['locs'].float_list.value)
         locs = locs.reshape([maxn, n_classes, 2])
