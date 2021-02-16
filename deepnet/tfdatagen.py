@@ -925,11 +925,17 @@ def xylist2xyarr(xylist, xisscalarlist=False, yisscalarlist=False):
 
 
 def montage(ims0, ims0type='batchlast',
-            locs=None, locs2=None, fignum=1, figsize=(25, 25), axes_pad=0.0,
+            locs=None, locs2=None,
+            fignum=1, figsize=(25, 25), axes_pad=0.0,
             share_all=True, label_mode='1', cmap='viridis',
-            cbclr='g',
+            do_cb=True, cbclr='g', lbls=None,
             locsmrkr='.', locs2mrkr='x',
-            locsmrkrsz=16, locscmap='jet'):
+            locsmrkrsz=16, locscmap='jet',
+            locsclr=None, locs2clr=None,
+            locscent=False,locs2cent=False,
+            locscentmrkrsz=90,
+            ):
+
     '''
 
     :param ims0: [nr x nc x N] (assumed b/w); or [N x nr x nc] see next
@@ -941,6 +947,7 @@ def montage(ims0, ims0type='batchlast',
     :param share_all:
     :param label_mode:
     :param cmap:
+    :param lbls: None, or [N] list of strings
     :param locsmrkr:
     :param locsmrkrsz:
     :return:
@@ -963,29 +970,45 @@ def montage(ims0, ims0type='batchlast',
                           axes_pad=axes_pad,  # pad between axes in inch.
                           share_all=share_all,
                           label_mode=label_mode,
-                          cbar_mode='each',
+                          cbar_mode='each' if do_cb else None,
                           )
+
+    climmax = 1.0 if np.max(ims)<=1.0 else 255.
 
     for iim in range(nim):
         him = grid[iim].imshow(ims[..., iim], cmap=cmap)
-        him.set_clim(0., 255.)
-        cb = grid.cbar_axes[iim].colorbar(him)
-        cb.ax.tick_params(color='r')
-        plt.setp(plt.getp(cb.ax, 'yticklabels'), color=cbclr)
+        him.set_clim(0., climmax)
+        if do_cb:
+            cb = grid.cbar_axes[iim].colorbar(him)
+            cb.ax.tick_params(color='r')
+            plt.setp(plt.getp(cb.ax, 'yticklabels'), color=cbclr)
+        if lbls:
+            grid[iim].text(15, 15, lbls[iim], color='y',
+                           verticalalignment='top',
+                           fontsize=20)
         if iim == 0:
-            cb0 = cb
+            cb0 = cb if do_cb else None
         if locs is not None:
             assert locs.shape[0] == nim
             jetmap = cm.get_cmap(locscmap)
-            rgba = jetmap(np.linspace(0, 1, locs.shape[1]))
-            grid[iim].scatter(locs[iim, :, 0], locs[iim, :, 1], c=rgba,
+            locsc = locsclr if locsclr is not None \
+                else jetmap(np.linspace(0, 1, locs.shape[1]))
+            grid[iim].scatter(locs[iim, :, 0], locs[iim, :, 1], c=locsc,
                               marker=locsmrkr, s=locsmrkrsz)
+            if locscent:
+                xc = np.mean(locs[iim,...],axis=0)
+                grid[iim].scatter(xc[0],xc[1],c=locsc,marker='o',s=locscentmrkrsz)
         if locs2 is not None:
             assert locs2.shape[0] == nim
             jetmap = cm.get_cmap(locscmap)
-            rgba = jetmap(np.linspace(0, 1, locs2.shape[1]))
-            grid[iim].scatter(locs2[iim, :, 0], locs2[iim, :, 1], c=rgba,
+            locsc = locs2clr if locs2clr is not None \
+                else jetmap(np.linspace(0, 1, locs2.shape[1]))
+            grid[iim].scatter(locs2[iim, :, 0], locs2[iim, :, 1],
+                              c=locsc,
                               marker=locs2mrkr, s=locsmrkrsz)
+            if locs2cent:
+                xc = np.mean(locs2[iim,...],axis=0)
+                grid[iim].scatter(xc[0],xc[1],c=locsc,marker='o',s=locscentmrkrsz)
 
     for iim in range(nim, nplotr * nplotc):
         grid[iim].imshow(np.zeros(ims.shape[0:2]))

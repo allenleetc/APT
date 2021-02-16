@@ -214,6 +214,16 @@ def to_mat(in_data):
     return convert(in_data,to_python=False)
 
 def tf_serialize(data):
+    '''
+
+    :param data: [frame, locs, info, occ (opt), rois (opt)]
+        frame: [imnr x imnc x imc]
+        locs: [ntgt x npts x 2 (x/y)]
+        info: [mov, frm, tgt] 0-based
+        occ: [ntgt x npts]
+        roi: [ntgt x 4 x 2]
+    :return: str
+    '''
     # serialize data for writing to tf records file.
     frame_in, cur_loc, info = data[:3]
     if len(data)>3:

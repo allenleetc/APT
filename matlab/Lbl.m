@@ -70,6 +70,10 @@ classdef Lbl
       for ifrm=1:nfrm
         s = locg.locdata(ifrm);
         imf = fullfile(packdir,s.img);
+        if iscell(imf)
+          assert(isscalar(imf));
+          imf = imf{1};
+        end
         im = imread(imf);
         
         clf;
