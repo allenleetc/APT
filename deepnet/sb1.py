@@ -3,7 +3,7 @@ from __future__ import division
 
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Concatenate
-from tensorflow.keras.layers import Activation, Input, Lambda, PReLU
+from tensorflow.keras.layers import Activation, Input, Lambda
 from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.layers import Conv2DTranspose
 from tensorflow.keras.layers import MaxPooling2D
@@ -33,95 +33,9 @@ import tfdatagen as opdata
 import heatmap
 import open_pose4 as op
 import util
+import vgg_cpm
 
 ISPY3 = sys.version_info >= (3, 0)
-
-
-def upsample_filt(alg='nn', dtype=None):
-    if alg == 'nn':
-        x = np.array([[0., 0., 0., 0.],
-                      [0., 1., 1., 0.],
-                      [0., 1., 1., 0.],
-                      [0., 0., 0., 0.]], dtype=dtype.as_numpy_dtype)
-    elif alg == 'bl':
-        x = np.array(
-            [[0.0625, 0.1875, 0.1875, 0.0625],
-             [0.1875, 0.5625, 0.5625, 0.1875],
-             [0.1875, 0.5625, 0.5625, 0.1875],
-             [0.0625, 0.1875, 0.1875, 0.0625]], dtype=dtype.as_numpy_dtype)
-    else:
-        assert False
-    return x
-
-def upsample_init_value(shape, alg='nn', dtype=None):
-    # Return numpy array for initialization value
-
-    print("upsample initializer desired shape, type: {}, {}".format(shape,dtype))
-    f = upsample_filt(alg, dtype)
-
-    filtnr, filtnc, kout, kin = shape
-    assert kout == kin  # for now require equality
-    if kin > kout:
-        wstr = "upsample filter has more inputs ({}) than outputs ({}). Using truncated identity".format(kin, kout)
-        logging.warning(wstr)
-
-    xinit = np.zeros(shape)
-    for i in range(kout):
-        xinit[:, :, i, i] = f
-
-    return xinit
-
-def upsample_initializer(shape, alg='nn', dtype=None):
-    xinit = upsample_init_value(shape, alg, dtype)
-    return K.variable(value=xinit, dtype=dtype)
-# could use functools.partial etc
-def upsamp_init_nn(shape, dtype=None, partition_info=None):
-    return upsample_initializer(shape, 'nn', dtype)
-def upsamp_init_bl(shape, dtype=None, partition_info=None):
-    return upsample_initializer(shape, 'bl', dtype)
-
-def make_kernel_regularizer(kinit, kweightdecay):
-    # kinit: numpy array with initial value of tensor
-
-    k0 = K.constant(kinit)
-
-    def reg(wmat):
-        assert k0.shape.as_list() == wmat.shape.as_list()
-        return kweightdecay * K.sum(K.square(Subtract([k0, wmat])))
-
-    return reg
-
-def deconv_2x_upsampleinit(x, nf, ks, name, wd, wdmode):
-    # init around upsampling
-    #
-    # wd: None, or [2]: kernel, then bias weight decay
-    # wdmode: 0 'aroundzero' or  1 'aroundinit'
-
-    assert ks == 4, "Filtersize must be 4, using upsamp_init_bl"
-    # nf must also equal number of channels in x
-
-    if wdmode == 0:  # 'aroundzero':
-        kernel_reg = l2(wd[0]) if wd else None
-        bias_reg = l2(wd[1]) if wd else None
-        logging.info("Deconv: regularization around zero with weights {}".format(wd))
-    elif wdmode == 1:  # 'aroundinit'
-        kshape = (ks, ks, nf, nf)
-        kinit = upsample_init_value(kshape, 'bl')
-        kernel_reg = make_kernel_regularizer(kinit, wd[0])
-        bias_reg = l2(wd[1]) if wd else None
-        logging.info("Deconv: regularization around init with weights {}".format(wd))
-    else:
-        assert False
-
-    x = Conv2DTranspose(nf, (ks, ks), strides=2,
-                        padding='same', name=name,
-                        kernel_regularizer=kernel_reg,
-                        bias_regularizer=bias_reg,
-                        kernel_initializer=upsamp_init_bl,
-                        bias_initializer=constant(0.0))(x)
-    logging.info("Using 2xdeconv w/init around upsample, wdmode={}, wd={}.".format(wdmode, wd))
-
-    return x
 
 def get_training_model(imszuse,
                        wd_kernel,
@@ -130,7 +44,9 @@ def get_training_model(imszuse,
                        npts=19,
                        backbone='ResNet50_8px',
                        backbone_weights=None,
-                       upsamp_chan_handling='direct_deconv'):
+                       upsamp_chan_handling='direct_deconv',
+                       is_testing_model=False,
+                       ):
 
     '''
 
@@ -141,6 +57,10 @@ def get_training_model(imszuse,
         Inputs: [img]
         Outputs: [hmap (res determined by backbone+nDC)]
     '''
+
+    if is_testing_model:
+        assert wd_kernel is None
+        assert backbone_weights is None
 
     imnruse, imncuse = imszuse
     assert imnruse % 32 == 0, "Image size must be divisible by 32"
@@ -164,14 +84,16 @@ def get_training_model(imszuse,
 
     x = backboneF
 
+    assert nDC == 0
     DCFILTSZ = 4
     if upsamp_chan_handling == 'reduce_first':
+        assert False
         REDUCEFILTSZ = 1
         x = conv(x, dc_num_filt, REDUCEFILTSZ, 'bb_reduce', (wd_kernel, 0.0))
         for iDC in range(nDC):
             dcname = "dc-{}".format(iDC)
             x = deconv_2x_upsampleinit(x, dc_num_filt, DCFILTSZ, dcname, None, 0)
-            x = prelu(x, "{}-prelu".format(dcname))
+            x = op.prelu(x, "{}-prelu".format(dcname))
 
         logging.info("Deconvs. Reduce first with filtsz={}. Added {} deconvs with filtsz={}, nfilt={}".format(REDUCEFILTSZ, nDC, DCFILTSZ, dc_num_filt))
     elif upsamp_chan_handling == 'direct_deconv':
@@ -186,25 +108,30 @@ def get_training_model(imszuse,
                                 name=dcname,
                                 kernel_initializer=init_trunc_norm,
                                 bias_initializer=init_zero)(x)
-            x = prelu(x, "{}-prelu".format(dcname))
+            x = op.prelu(x, "{}-prelu".format(dcname))
 
         logging.info("Deconvs. direct deconv. Added {} deconvs with filtsz={}, nfilt={}".format(nDC, DCFILTSZ, dc_num_filt))
     else:
-         assert False
+        assert False
 
     #nfilt = x.shape.as_list()[-1]
     #x = conv(x, npts nf1by1, 1, "{}-stg{}-1by1-1".format(stagety, stageidx), (wd_kernel, 0))
     #x = prelu(x, "{}-stg{}-postDC-1by1-1-prelu".format(stagety, stageidx))
 
-    x = Conv2D(npts, (1, 1),
-               padding='same',
-               name="out-1by1",
-               kernel_regularizer=l2(wd_kernel),
-               bias_regularizer=None,
-               kernel_initializer=tf.keras.initializers.VarianceScaling(),
-               bias_initializer=constant(0.0))(x)
+    #x = Conv2D(npts, (1, 1),
+    #           padding='same',
+    #           name="out-1by1",
+    #           kernel_regularizer=l2(wd_kernel),
+    #           bias_regularizer=None,
+    #           kernel_initializer=tf.keras.initializers.VarianceScaling(),
+    #           bias_initializer=constant(0.0))(x)
     #x = conv(x, npts, 1, "out-1by1", (wd_kernel, 0.0))
-    x = prelu(x, "out-1by1-prelu")
+    #x = prelu(x, "out-1by1-prelu")
+
+    #x = vgg_cpm.conv(x, nf1by1, 1, kernel_reg, name="{}-stg{}-1by1-1".format(stagety, stageidx))
+    #x = prelu(x, "{}-stg{}-postDC-1by1-1-prelu".format(stagety, stageidx))
+    x = vgg_cpm.conv(x, npts, 1, wd_kernel, name="1by1")
+    x = op.prelu(x, "post1by1")
 
     outputs = [x,]
 
@@ -241,13 +168,14 @@ def configure_losses(model, bsize):
 
     return losses, loss_weights, loss_weights_vec
 
+'''
 def get_testing_model(imszuse,
                       nDC=3,
                       dc_num_filt=256,
                       npts=19,
                       backbone='Resnet50_8px',
                       upsamp_chan_handling='direct_deconv'):
-    '''
+    
     See get_training_model
     :param imszuse:
     :param nPAFstg:
@@ -256,7 +184,7 @@ def get_testing_model(imszuse,
     :param npts:
     :param fullpred:
     :return:
-    '''
+    
 
     imnruse, imncuse = imszuse
     assert imnruse % 32 == 0, "Image size must be divisible by 32"
@@ -293,19 +221,12 @@ def get_testing_model(imszuse,
     elif upsamp_chan_handling == 'direct_deconv':
         for iDC in range(nDC):
             dcname = "dc-{}".format(iDC)
-            x = Conv2DTranspose(dc_num_filt, (DCFILTSZ, DCFILTSZ),
-                                strides=2,
-                                padding='same',
-                                name=dcname)(x)
+            x = op.deconv_2x_upsampleinit(x, dc_num_filt, DCFILTSZ, dcname, None, 0)
             x = prelu(x, "{}-prelu".format(dcname))
 
         logging.info("Deconvs. direct deconv. Added {} deconvs with filtsz={}, nfilt={}".format(nDC, DCFILTSZ, dc_num_filt))
     else:
         assert False
-
-    #nfilt = x.shape.as_list()[-1]
-    #x = conv(x, npts nf1by1, 1, "{}-stg{}-1by1-1".format(stagety, stageidx), (wd_kernel, 0))
-    #x = prelu(x, "{}-stg{}-postDC-1by1-1-prelu".format(stagety, stageidx))
 
     x = Conv2D(npts, (1, 1),
                padding='same',
@@ -318,39 +239,13 @@ def get_testing_model(imszuse,
     model = Model(inputs=inputs, outputs=outputs)
     return model
 
-
+'''
 
 
 # ---------------------
 # -- Training ---------
 #----------------------
 
-'''
-def set_openpose_defaults(conf):
-    conf.label_blur_rad = 5
-    conf.rrange = 5
-    conf.display_step = 50 # this is same as batches per epoch
-    conf.dl_steps = 600000
-    conf.batch_size = 10
-    conf.n_steps = 4.41
-    conf.gamma = 0.333
-'''
-
-'''
-def get_im_pad(sz, dimname):
-    BASE = 32
-    szmod = sz % BASE
-    if szmod == 0:
-        pad = 0
-        szuse = sz
-    else:
-        pad = BASE - szmod
-        szuse = sz + pad
-        warnstr = 'Image {} dimension ({}) is not a multiple of {}. Image will be padded'.format(dimname, sz, BASE)
-        logging.warning(warnstr)
-
-    return pad, szuse
-'''
 
 def compute_padding_imsz_net(imsz, rescale, n_transition_max):
     '''

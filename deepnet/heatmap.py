@@ -185,7 +185,7 @@ def find_peaks(map, thre):
 
     return peaks_with_score
 
-def create_label_hmap(locs, imsz, sigma, clip=0.05, usefmax=False):
+def create_label_hmap(locs, imsz, sigma, clip=0.05, usefmax=False, assert_when_naninf=True):
     """
     Create/return target hmap for parts
 
@@ -215,7 +215,12 @@ def create_label_hmap(locs, imsz, sigma, clip=0.05, usefmax=False):
             for mndx in range(n_max):
                 x0 = locs[cur, mndx, ndx, 0]
                 y0 = locs[cur, mndx, ndx, 1]
-                assert not (np.isnan(x0) or np.isnan(y0) or np.isinf(x0) or np.isinf(y0))
+                if np.isnan(x0) or np.isnan(y0) or np.isinf(x0) or np.isinf(y0):
+                    if assert_when_naninf:
+                        assert False, "nan/inf loc encountered in heatmap creation"
+                    else:
+                        continue
+
                 if (x0 < -1000) or (y0 < -1000):
                     continue
 
