@@ -5,6 +5,8 @@ import time
 import timeit
 import distutils  # prefer packaging in future
 import h5py
+import scipy
+import heapq
 from scipy import stats
 import scipy.io as sio
 import skimage.measure
@@ -184,6 +186,38 @@ def find_peaks(map, thre):
     peaks_with_score = [x + (map[x[1], x[0]],) for x in peaks]
 
     return peaks_with_score
+
+
+def find_peaks_nlargest(hmap, nlrg):
+    '''
+    Find local maxima above thresh
+    :param map:
+    :param thre:
+    :return: list of (x,y,amplitude) of qualifying peaks found
+    '''
+    
+    #thre = 0.05
+    
+    #map_left = np.zeros(map.shape)  # "down"?
+    #map_left[1:, :] = map[:-1, :]
+    #map_right = np.zeros(map.shape)  # "up"?
+    #map_right[:-1, :] = map[1:, :]
+    #map_up = np.zeros(map.shape)  # "right"
+    #map_up[:, 1:] = map[:, :-1]
+    #map_down = np.zeros(map.shape)  # "left"
+    #map_down[:, :-1] = map[:, 1:]
+
+    # assumes map is positive semidef i guess
+    #peaks_binary = np.logical_and.reduce(
+    #    (map >= map_left, map >= map_right, map >= map_up, map >= map_down, map > thre))
+    
+    maxf = scipy.ndimage.maximum_filter(hmap,size=(3,3),mode='constant',cval=9999.)
+    nz = np.nonzero(hmap==maxf)
+    ijs = list(zip(*nz))
+    xyscore = [(x[1],x[0],hmap[x[0],x[1]]) for x in ijs]
+    top = heapq.nlargest(nlrg,xyscore,key=lambda s:s[2])
+    return top
+
 
 def create_label_hmap(locs, imsz, sigma, clip=0.05, usefmax=False, assert_when_naninf=True):
     """

@@ -234,7 +234,7 @@ class NpEncoder(json.JSONEncoder):
 
 def track(args):
 
-    HMTHRESH = 0.5
+    HMTHRESH = 0.25
     FRMPRINTDEC = 50
     FRMSAVEDEC = 500
 
@@ -282,7 +282,7 @@ def track(args):
         assert hm.shape[0] == 1
         assert hm.shape[-1] == 1
         hm = hm[0, ..., 0]
-        pksthis = heatmap.find_peaks(hm, HMTHRESH)
+        pksthis = heatmap.find_peaks_nlargest(hm, 5)
         #if len(pksthis) != 2:
         #    print("{}: len(pks)={}".format(frm, len(pksthis)))
         pks.append(pksthis)
