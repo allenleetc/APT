@@ -1144,7 +1144,7 @@ def read_and_decode_without_session_multi(filename, n_classes):
         width = int(example.features.feature['width'].int64_list.value[0])
         depth = int(example.features.feature['depth'].int64_list.value[0])
         expid = int(example.features.feature['expndx'].float_list.value[0])
-        maxn = int(example.features.feature['max_n'].int64_list.value[0])
+        maxn = int(example.features.feature['ntgt'].int64_list.value[0])
         t = int(example.features.feature['ts'].float_list.value[0])
         img_string = example.features.feature['image_raw'].bytes_list.value[0]
         img_1d = np.fromstring(img_string, dtype=np.uint8)
