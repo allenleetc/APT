@@ -529,6 +529,10 @@ def ims_locs_preprocess_dpk_noconf_nodistort(imsraw, locsraw, conf, distort):
 def ims_locs_preprocess_dummy(imsraw, locsraw, conf, distort):
     return imsraw, locsraw, None
 
+def ims_locs_preprocess_multi_dummy(imsraw, locsraw, conf, distort, mask=None):
+    return imsraw, locsraw, None, mask
+
+
 def data_generator(tfrfilename, conf, distort, shuffle, ims_locs_proc_fn,
                    debug=False,
                    infinite=True,
