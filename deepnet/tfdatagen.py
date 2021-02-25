@@ -198,7 +198,7 @@ def parse_record(record, npts):
 
     return reconstructed_img, locs, info
 
-def parse_record_multi(record, npts, n_max,apply_mask=False):
+def parse_record_multi(record, npts, n_max, apply_mask=False):
     example = tf.train.Example()
     example.ParseFromString(record)
     height = int(example.features.feature['height'].int64_list.value[0])
@@ -535,6 +535,7 @@ def ims_locs_preprocess_multi_dummy(imsraw, locsraw, conf, distort, mask=None):
 
 def data_generator(tfrfilename, conf, distort, shuffle, ims_locs_proc_fn,
                    debug=False,
+                   strat2=False, # if true, centdet strat 2
                    infinite=True,
                    instrumented=False,
                    instrumentedname=None):
@@ -625,7 +626,8 @@ def data_generator(tfrfilename, conf, distort, shuffle, ims_locs_proc_fn,
 
             is_multi = getattr(conf, 'is_multi', False)
             if is_multi:
-                recon_img, locs, info, mask = parse_record_multi(record, conf.n_classes,conf.max_n_animals,apply_mask=conf.multi_use_mask)
+                recon_img, locs, info, mask = parse_record_multi(record, conf.n_classes,conf.max_n_animals,
+                                                                 apply_mask=conf.multi_use_mask)
                 all_mask.append(mask)
             else:
                 recon_img, locs, info = parse_record(record, conf.n_classes)
@@ -691,6 +693,8 @@ def data_generator(tfrfilename, conf, distort, shuffle, ims_locs_proc_fn,
 
         if debug:
             yield [ims, mask], targets, locs, info
+        elif strat2:
+            yield [ims, mask, targets], None
         else:
             yield [ims, mask], targets
             # (inputs, targets)
@@ -938,6 +942,7 @@ def montage(ims0, ims0type='batchlast',
             locsclr=None, locs2clr=None,
             locscent=False,locs2cent=False,
             locscentmrkrsz=90,
+            masks=None,maskalpha=0.5,
             ):
 
     '''
@@ -958,9 +963,14 @@ def montage(ims0, ims0type='batchlast',
     '''
     from matplotlib import cm
 
+    do_mask = masks is not None
+
     if ims0type == 'batchfirst':
         ims = np.moveaxis(ims0, 0, -1)
         ims = ims[:, :, 0, :]
+
+        if do_mask:
+            masks = np.moveaxis(masks,0,-1)
     else:
         ims = ims0
 
@@ -979,9 +989,12 @@ def montage(ims0, ims0type='batchlast',
 
     climmax = 1.0 if np.max(ims)<=1.0 else 255.
 
+
     for iim in range(nim):
         him = grid[iim].imshow(ims[..., iim], cmap=cmap)
         him.set_clim(0., climmax)
+        if do_mask:
+            grid[iim].imshow(masks[...,iim], alpha=maskalpha)
         if do_cb:
             cb = grid.cbar_axes[iim].colorbar(him)
             cb.ax.tick_params(color='r')

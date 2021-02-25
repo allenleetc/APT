@@ -137,6 +137,7 @@ class config(object):
         self.sb_blur_rad_output_res = None  # runtime-computed
         self.sb_hmpp_floor = 0.1
         self.sb_hmpp_nclustermax = 1
+        self.sb_ma_mask_strategy = 0
 
         # ------ Leap params
         self.leap_net_name = "leap_cnn"

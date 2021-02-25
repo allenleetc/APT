@@ -24,7 +24,7 @@ APT_DEEPNET = r'/dat0/git/apt.ma/deepnet'
 sys.path.append(APT_DEEPNET)
 import movies
 
-def pp(ims, in_locs, distort, horz_flip=True, vert_flip=True,
+def pp(ims, in_locs, distort, scale, mask=None, horz_flip=True, vert_flip=True,
        flm=None, brange=None, crange=None, imax=None):
     '''
 
@@ -40,12 +40,13 @@ def pp(ims, in_locs, distort, horz_flip=True, vert_flip=True,
     conf.crange = crange
     conf.imax = imax
     group_sz = 1
-    mask = None
 
     locs = in_locs.copy()
     cur_im = ims.copy()
     cur_im = cur_im.astype('uint8')
     xs = cur_im
+    xs, locs, mask = pt.scale_images(xs, locs, scale, conf, mask=mask)  # conf not used
+
     if distort:
         if horz_flip:
             xs, locs, mask = pt.randomly_flip_lr(xs, locs, conf, group_sz=group_sz, mask=mask)
@@ -55,10 +56,10 @@ def pp(ims, in_locs, distort, horz_flip=True, vert_flip=True,
 
     xs = xs.astype('float')
 
-    return xs, locs
+    return xs, locs, mask
 
 
-def ims_locs_pp(imsraw, locsraw, conf, distort, gen_target_hmaps=True, mask=None):
+def ims_locs_pp(imsraw, locsraw, conf, distort, mask=None, gen_target_hmaps=True,):
     '''
     :param imsraw: BHWC
     :param locsraw: B x ntgt x npt x 2
@@ -68,27 +69,46 @@ def ims_locs_pp(imsraw, locsraw, conf, distort, gen_target_hmaps=True, mask=None
 
     assert conf.imsz == imsraw.shape[1:3]
 
+    do_mask = mask is not None
+    if do_mask:
+        assert mask.ndim == 3
+        assert imsraw.shape[:3] == mask.shape
+
     # take centroid
-    locsraw = np.mean(locsraw, axis=2, keepdims=True)
-    #locsraw = locsraw[:, :, np.newaxis, :]
+    locscent = np.mean(locsraw, axis=2, keepdims=True)
 
-    imspad, locspad = tfdatagen.pad_ims_black(imsraw, locsraw, conf.sb_im_pady, conf.sb_im_padx)
+    # TODO: enable padding of mask
+    assert conf.sb_im_pady == 0
+    assert conf.sb_im_padx == 0
+    if False:
+        pass
+        #imspad, locscentpad = tfdatagen.pad_ims_black(imsraw, locscent, conf.sb_im_pady, conf.sb_im_padx)
+    else:
+        imspad = imsraw
+        locscentpad = locscent
+        if do_mask:
+            maskpad = mask
     assert imspad.shape[1:3] == conf.sb_imsz_pad
+    if do_mask:
+        assert maskpad.shape[1:3] == conf.sb_imsz_pad
 
-    ims, locs = pp(imspad, locspad, distort,
-                   flm=conf.flipLandmarkMatches,
-                   brange=conf.brange, crange=conf.crange, imax=conf.imax,
-                   )
+    ims, locs, mask = pp(imspad, locscentpad, distort, conf.rescale, mask=maskpad,
+                         flm=conf.flipLandmarkMatches,
+                         brange=conf.brange, crange=conf.crange, imax=conf.imax,
+                         )
 
     imszuse = conf.sb_imsz_net  # network input dims
     (imnr_use, imnc_use) = imszuse
     assert ims.shape[1:3] == imszuse
     assert ims.shape[3] == conf.img_dim
+    if do_mask:
+        assert mask.shape[1:3] == imszuse
+
     if conf.img_dim == 1:
         ims = np.tile(ims, 3)
 
     if not gen_target_hmaps:
-        return ims, locs
+        return ims, locs, mask
 
     assert (imnr_use/conf.sb_output_scale).is_integer() and \
            (imnc_use/conf.sb_output_scale).is_integer(), \
@@ -101,13 +121,10 @@ def ims_locs_pp(imsraw, locsraw, conf, distort, gen_target_hmaps=True, mask=None
                                                  usefmax=True,
                                                  assert_when_naninf=False,
                                                  )
-    targets = [label_map_outres,]
+    targets = label_map_outres
 
-#    if not __ims_locs_preprocess_sb_has_run__:
-#        logr.info('sb preprocess. sb_out_scale={}, imszuse={}, imszout={}, blurradout={#}'.format(conf.sb_output_scale, imszuse, imsz_out, conf.sb_blur_rad_output_res))
- #       __ims_locs_preprocess_sb_has_run__ = True
 
-    return ims, locs, targets, None
+    return ims, locs, targets, mask
 
 
 def make_data_generator(tfrfilename, conf0, distort, shuffle, silent=False,
@@ -147,7 +164,7 @@ def eucl_loss(x, y):
     return K.sum(K.square(x - y)) / 2.0
 
 
-def training(conf):
+def training(conf, return_model=False):
 
     assert not conf.normalize_img_mean, "SB currently performs its own img input norm"
     assert not conf.normalize_batch_mean, "SB currently performs its own img input norm"
@@ -158,25 +175,32 @@ def training(conf):
     assert conf.save_step % steps_per_epoch == 0, ' save steps must be a multiple of display steps'
 
     train_data_file = os.path.join(conf.cachedir, 'conf.trn.pickle')
-    with open(train_data_file, 'wb') as td_file:
-        pickle.dump(conf, td_file, protocol=2)
-    logging.info('Saved config to {}'.format(train_data_file))
+    if not return_model:
+        with open(train_data_file, 'wb') as td_file:
+            pickle.dump(conf, td_file, protocol=2)
+        logging.info('Saved config to {}'.format(train_data_file))
 
     model = sb.get_training_model(conf.sb_imsz_net,
-                               conf.sb_weight_decay_kernel,
-                               nDC=conf.sb_num_deconv,
-                               dc_num_filt=conf.sb_deconv_num_filt,
-                               npts=1,  #conf.n_classes,
-                               backbone=conf.sb_backbone,
-                               backbone_weights=conf.sb_backbone_weights,
-                               upsamp_chan_handling=conf.sb_upsamp_chan_handling)
+                                  conf.sb_weight_decay_kernel,
+                                  nDC=conf.sb_num_deconv,
+                                  dc_num_filt=conf.sb_deconv_num_filt,
+                                  npts=1,  #conf.n_classes,
+                                  backbone=conf.sb_backbone,
+                                  backbone_weights=conf.sb_backbone_weights,
+                                  mask_strategy=conf.sb_ma_mask_strategy,
+                                  )
+
     conf.sb_output_scale = sb.get_output_scale(model)
     conf.sb_blur_rad_output_res = \
         max(1.0, conf.sb_blur_rad_input_res / float(conf.sb_output_scale))
     logging.info('Model output scale is {}, blurrad_input/output is {}/{}'.format(conf.sb_output_scale, conf.sb_blur_rad_input_res, conf.sb_blur_rad_output_res))
 
     trntfr = os.path.join(conf.cachedir, conf.trainfilename) + '.tfrecords'
-    train_di = make_data_generator(trntfr, conf, True, True)
+    is_strat2 = conf.sb_ma_mask_strategy == 2
+    train_di = make_data_generator(trntfr, conf, True, True, strat2=is_strat2)
+
+    if return_model:
+        return model, train_di
 
     callbacks_list = create_train_callbacks(conf)
 
@@ -184,7 +208,10 @@ def training(conf):
     # Decay: 0.0 bc lr schedule handled above by callback/LRScheduler
     optimizer = Adam(lr=conf.sb_base_lr, beta_1=0.9, beta_2=0.999,
                      epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(loss=eucl_loss, optimizer=optimizer)
+    if is_strat2:
+        model.compile(loss=None, optimizer=optimizer)
+    else:
+        model.compile(loss=eucl_loss, optimizer=optimizer)
     logging.info("Your model.metrics_names are {}".format(model.metrics_names))
 
     # save initial model
@@ -202,24 +229,30 @@ def training(conf):
     #model.save(str(os.path.join(conf.cachedir, name + '-{}'.format(int(max_epoch*steps_per_epoch)))))
     #obs.on_epoch_end(max_epoch-1)
 
-def train(edir):
-    SLBL = '/dat0/det/dat/four_points_all_mouse_linux_tracker_updated20200423_new_skl_20200817.lbl_mdn.lbl'
-    #TFR = '/dat0/det/dat/nor_carefulcrop.tfrecords'
-    conf = apt.create_conf(SLBL, 0, 'sbcent', edir, 'sb', quiet=False)
-    conf.img_dim = 1  # hack?
-    conf.is_multi = True
-    # apt.setup_ma(conf)
-    conf.imsz = (576, 576)
-    # op.update_conf(conf)
-    sb.update_conf(conf)
-    conf.max_n_animals = 2
-    conf.multi_use_mask = False
-    conf.trainfilename = 'train'
-    conf.cachedir = edir
-    conf.sb_num_deconv = 0
-    #conf.n_classes = 1
+def train(args,**kwargs):
+    if args.data_key == 'ar':
+        SLBL = '/dat0/det/dat' + \
+               '/multitarget_bubble_expandedbehavior_20180425_FxdErrs_OptoParams20200317_stripped20200403_new_skl_20200817.lbl'
+        conf = apt.create_conf(SLBL, 0, 'centdet', args.run_dir, 'sb', quiet=False)
 
-    training(conf)
+        conf.img_dim = 1  # hack, the leap stripped lbl has NumChans=3, but we created the tfr
+        conf.is_multi = True
+        # apt.setup_ma(conf)
+        conf.imsz = (1024, 1024)
+        conf.rescale = 2
+        conf.batch_size = 4
+        sb.update_conf(conf)
+        conf.max_n_animals = 11
+        conf.multi_use_mask = False  # whether mask applied to im at TFR-read-time
+        conf.trainfilename = 'train'
+        conf.cachedir = args.run_dir
+        conf.sb_num_deconv = 0
+        conf.sb_output_scale = 8
+        conf.sb_blur_rad_output_res = \
+            max(1.0, conf.sb_blur_rad_input_res / float(conf.sb_output_scale))
+        conf.sb_ma_mask_strategy = args.mask_strat
+
+    return training(conf, **kwargs)
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -304,12 +337,13 @@ def parse_args(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('-base_dir', default="/dat0/det", help="All other dirs/files spec'd wrt this dir")
     parser.add_argument("-run_name", required=True)
-    #parser.add_argument("-data_key", choices=['ar', 'nor'], help="convenience arg that specs data_dir and data_ann")
+    parser.add_argument("-data_key", choices=['ar', 'nor'], help="convenience arg")
     #parser.add_argument('-data_dir')
     #parser.add_argument('-data_ann')
     #parser.add_argument('-cfg_yaml', required=True)
     subparsers = parser.add_subparsers(help='train or track', dest='action')
-    #parser_train = subparsers.add_parser('train', help='Train the detector')
+    parser_train = subparsers.add_parser('train', help='Train the detector')
+    parser_train.add_argument('-mask_strat', choices=[0,1,2], type=int, required=True)
     parser_track = subparsers.add_parser('track', help='Track a movie')
     parser_track.add_argument('-model', required=True, help='short/relative model filename')
     parser_track.add_argument("-mov", required=True, help="movie to track")
@@ -320,8 +354,8 @@ def parse_args(argv):
     print(argv)
 
     args = parser.parse_args(argv)
-    #args.run_dir = os.path.join(args.base_dir, args.run_name)
-    #assert os.path.exists(args.run_dir)
+    args.run_dir = os.path.join(args.base_dir, args.run_name)
+    assert os.path.exists(args.run_dir)
     #if args.data_key is not None:
     #    assert args.data_dir is None and args.data_ann is None, "If data_key is supplied, don't supply data_dir or data_ann."
     #    if args.data_key == 'ar':
@@ -343,8 +377,8 @@ def parse_args(argv):
     #else:
     #    assert False, "Unrecognized action"
 
-    #args.cfg_yaml = os.path.join(args.run_dir, 'cfg.yaml')
-    #args.cfg_full_yaml = os.path.join(args.run_dir, 'cfg_full.yaml')
+    args.cfg_yaml = os.path.join(args.run_dir, 'cfg.yaml')
+    args.cfg_full_yaml = os.path.join(args.run_dir, 'cfg_full.yaml')
 
     return args
 
@@ -357,5 +391,3 @@ def main(argv):
 if __name__ == "__main__":
     print(os.path.abspath(__file__))
     main(sys.argv[1:])
-
-

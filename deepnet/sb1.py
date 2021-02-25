@@ -45,6 +45,7 @@ def get_training_model(imszuse,
                        backbone='ResNet50_8px',
                        backbone_weights=None,
                        upsamp_chan_handling='direct_deconv',
+                       mask_strategy=0, # see below
                        is_testing_model=False,
                        ):
 
@@ -53,6 +54,18 @@ def get_training_model(imszuse,
     :param imszuse: (imnr, imnc) image size (typically adjusted/padded) for input into net
     :param wd_kernel: weight decay for l2 reg (applied only to weights not biases)
     :param npts:
+    :param mask_strategy:
+        * 0. no masking
+        * 1. mk-style.
+             - datagen produces regular target hmaps, and masks
+             - model input accepts image, mask (same sz)
+             - mask is applied to network output
+             - target hmap is not masked, but will only have peaks for labeled tgts, which are in unmasked areas
+             - MSE loss(mdloutput,tgt) will reduce err in unmasked areas
+        * 2. custom loss.
+            - data gen produces regular target hmaps, and masks
+            - model input accepts image, mask, target hmap
+            - custom loss added to model that is masked MSE between model output and target
     :return: Model.
         Inputs: [img]
         Outputs: [hmap (res determined by backbone+nDC)]
@@ -68,6 +81,13 @@ def get_training_model(imszuse,
 
     img_input = Input(shape=imszuse + (3,), name='input_img')
     inputs = [img_input, ]
+    if mask_strategy > 0:
+        mask_input = Input(shape=imszuse, name='input_mask')
+        inputs.append(mask_input)
+    if mask_strategy == 2:
+        tgt_input = Input(shape=(int(imnruse/8), int(imncuse/8), 1), name='target_hmap') # XXX shape[3]==1
+        inputs.append(tgt_input)
+
 
     img_normalized = Lambda(lambda z: z / 256. - 0.5)(img_input)  # [-0.5, 0.5] Isn't this really [-0.5, 0.496]
     # sub mean?
@@ -84,7 +104,7 @@ def get_training_model(imszuse,
 
     x = backboneF
 
-    assert nDC == 0
+    assert nDC == 0, "deconv init etc not updated"
     DCFILTSZ = 4
     if upsamp_chan_handling == 'reduce_first':
         assert False
@@ -133,12 +153,30 @@ def get_training_model(imszuse,
     x = vgg_cpm.conv(x, npts, 1, wd_kernel, name="1by1")
     x = op.prelu(x, "post1by1")
 
-    outputs = [x,]
+    outsz = x.get_shape()
+    DS_FAC = 8
+    DS_START = 4
+    assert outsz[1] == imnruse / DS_FAC
+    assert outsz[2] == imncuse / DS_FAC
+    if mask_strategy == 1:
+        x = x * mask_input[:, DS_START::DS_FAC, DS_START::DS_FAC, None]
 
+    outputs = [x,]
     model = Model(inputs=inputs, outputs=outputs)
+
+    if mask_strategy == 2:
+        mask_input_ds = mask_input[:, DS_START::DS_FAC, DS_START::DS_FAC, None]
+        tgt_input_use = tgt_input   # [..., None]
+        assert x.get_shape().as_list() == tgt_input_use.get_shape().as_list() == \
+                                          mask_input_ds.get_shape().as_list()
+        dsq = mask_input_ds * K.square(x - tgt_input_use)
+        mse_masked = K.sum(dsq) / 2.0
+        model.add_loss(mse_masked)
+        print("added masked loss to model")
+
     return model
 
-def configure_losses(model, bsize):
+def configure_losses(model):
     '''
     
     :param model: 
@@ -148,7 +186,7 @@ def configure_losses(model, bsize):
     '''
 
     def eucl_loss(x, y):
-        return K.sum(K.square(x - y)) / bsize / 2.0  # not sure why norm by bsize nec
+        return K.sum(K.square(x - y)) / 2.0  # not sure why norm by bsize nec
 
     losses = {}
     loss_weights = {}
@@ -301,7 +339,7 @@ def dot(K, L):
 
 def get_output_scale(model):
     # returns downsample scale (always >= 1; input assumed to be larger than out)
-    innr, innc = model.input.shape.as_list()[1:3]
+    innr, innc = model.inputs[0].shape.as_list()[1:3]
     otnr, otnc = model.output.shape.as_list()[1:3]
 
     assert innr >= otnr and innc >= otnc  # in theory doesnt need to hold

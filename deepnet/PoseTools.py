@@ -230,7 +230,8 @@ def randomly_flip_lr(img, in_locs, conf, group_sz = 1, mask=None):
         if jj > 0.5:
             img[st:en, ...] = img[st:en, :, ::-1, :]
             if mask is not None:
-                mask[st:en, ...] = mask[st:en,:,::-1]
+                assert mask.ndim==3
+                mask[st:en, ...] = mask[st:en, :, ::-1]
             for ll in range(locs.shape[2]):
                 str_ll = '{}'.format(ll)
                 if str_ll in pairs.keys():
@@ -271,7 +272,7 @@ def randomly_flip_ud(img, in_locs, conf, group_sz = 1, mask=None):
         if jj > 0.5:
             img[st:en, ...] = img[st:en, ::-1, : ,: ]
             if mask is not None:
-                mask[st:en, ...] = mask[st:en,::-1,:]
+                mask[st:en, ...] = mask[st:en, ::-1, :]
 
             for ll in range(locs.shape[2]):
                 str_ll = '{}'.format(ll)
