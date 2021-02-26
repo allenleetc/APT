@@ -342,8 +342,10 @@ def parse_args(argv):
     #parser.add_argument('-data_ann')
     #parser.add_argument('-cfg_yaml', required=True)
     subparsers = parser.add_subparsers(help='train or track', dest='action')
+
     parser_train = subparsers.add_parser('train', help='Train the detector')
     parser_train.add_argument('-mask_strat', choices=[0,1,2], type=int, required=True)
+
     parser_track = subparsers.add_parser('track', help='Track a movie')
     parser_track.add_argument('-model', required=True, help='short/relative model filename')
     parser_track.add_argument("-mov", required=True, help="movie to track")
