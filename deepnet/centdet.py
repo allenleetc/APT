@@ -20,9 +20,14 @@ import heatmap
 import sb1 as sb
 import apt_dpk_callbacks
 
-APT_DEEPNET = r'/dat0/git/apt.ma/deepnet'
+#APT_DEEPNET = r'/dat0/git/apt.ma/deepnet'
+APT_DEEPNET = r'/groups/branson/home/leea30/git/apt.2021/deepnet'
 sys.path.append(APT_DEEPNET)
 import movies
+
+SLBLAR = '/groups/branson/bransonlab/apt/experiments/data' + \
+         '/multitarget_bubble_expandedbehavior_20180425_FxdErrs_OptoParams20200317_stripped20200403_new_skl_20200817.lbl'
+BASE_DIR = '/groups/branson/home/leea30/det'
 
 def pp(ims, in_locs, distort, scale, mask=None, horz_flip=True, vert_flip=True,
        flm=None, brange=None, crange=None, imax=None):
@@ -231,8 +236,7 @@ def training(conf, return_model=False):
 
 def train(args,**kwargs):
     if args.data_key == 'ar':
-        SLBL = '/dat0/det/dat' + \
-               '/multitarget_bubble_expandedbehavior_20180425_FxdErrs_OptoParams20200317_stripped20200403_new_skl_20200817.lbl'
+        SLBL = SLBLAR
         conf = apt.create_conf(SLBL, 0, 'centdet', args.run_dir, 'sb', quiet=False)
 
         conf.img_dim = 1  # hack, the leap stripped lbl has NumChans=3, but we created the tfr
@@ -335,7 +339,7 @@ def track(args):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('-base_dir', default="/dat0/det", help="All other dirs/files spec'd wrt this dir")
+    parser.add_argument('-base_dir', default=BASE_DIR, help="All other dirs/files spec'd wrt this dir")
     parser.add_argument("-run_name", required=True)
     parser.add_argument("-data_key", choices=['ar', 'nor'], help="convenience arg")
     #parser.add_argument('-data_dir')
