@@ -45,7 +45,7 @@ def get_training_model(imszuse,
                        backbone='ResNet50_8px',
                        backbone_weights=None,
                        upsamp_chan_handling='direct_deconv',
-                       mask_strategy=0, # see below
+                       mask_strategy=0,  # see below
                        is_testing_model=False,
                        ):
 
@@ -74,6 +74,7 @@ def get_training_model(imszuse,
     if is_testing_model:
         assert wd_kernel is None
         assert backbone_weights is None
+        assert mask_strategy == 0
 
     imnruse, imncuse = imszuse
     assert imnruse % 32 == 0, "Image size must be divisible by 32"

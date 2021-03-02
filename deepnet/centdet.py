@@ -8,6 +8,7 @@ import sys
 import time
 import json
 
+import cv2
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import backend as K
@@ -271,6 +272,11 @@ class NpEncoder(json.JSONEncoder):
 
 def track(args):
 
+    if args.data_key == 'ar':
+        args.npeaks_find = 15
+    print("using npeaks_find = {}".format(args.npeaks_find))
+
+
     HMTHRESH = 0.25
     FRMPRINTDEC = 50
     FRMSAVEDEC = 500
@@ -280,6 +286,10 @@ def track(args):
     mdlf = os.path.join(edir, args.model)
     movf = os.path.join(args.base_dir, args.mov)
     outf = os.path.join(edir, args.out)
+    if args.raw_pred:
+        outrawpat_im = os.path.join(edir, os.path.splitext(args.out)[0] + '_{}_im.png')
+        outrawpat_pd = os.path.join(edir, os.path.splitext(args.out)[0] + '_{}_pd.json')
+
 
     conf = pt.pickle_load(conff)
     print("Loaded conf from {}".format(conff))
@@ -298,7 +308,9 @@ def track(args):
                                   npts=1,
                                   backbone=conf.sb_backbone,
                                   backbone_weights=None,
-                                  upsamp_chan_handling=conf.sb_upsamp_chan_handling)
+                                  upsamp_chan_handling=conf.sb_upsamp_chan_handling,
+                                  mask_strategy=0,
+                                  )
     model.load_weights(mdlf)
     print("Loaded model weights from {}".format(mdlf))
 
@@ -319,7 +331,15 @@ def track(args):
         assert hm.shape[0] == 1
         assert hm.shape[-1] == 1
         hm = hm[0, ..., 0]
-        pksthis = heatmap.find_peaks_nlargest(hm, 5)
+        if args.raw_pred:
+            outraw_im = outrawpat_im.format(frm)
+            outraw_pd = outrawpat_pd.format(frm)
+            cv2.imwrite(outraw_im, im)
+            with open(outraw_pd, 'w') as fh:
+                json.dump(hm, fh, cls=NpEncoder)
+            print("Wrote {} and {}".format(outraw_im, outraw_pd))
+
+        pksthis = heatmap.find_peaks_nlargest(hm, args.npeaks_find)
         #if len(pksthis) != 2:
         #    print("{}: len(pks)={}".format(frm, len(pksthis)))
         pks.append(pksthis)
@@ -356,6 +376,8 @@ def parse_args(argv):
     parser_track.add_argument("-out", default="trk.json", help="movie to track")
     parser_track.add_argument('-f0', help='start tracking from this frame', type=int, default=1)
     parser_track.add_argument('-f1', help='end frame for tracking', type=int, default=-1)
+    parser_track.add_argument('-npeaks_find', type=int)
+    parser_track.add_argument('-raw_pred', default=False, action='store_true')
     # track outdir; for now, use run_dir
     print(argv)
 
