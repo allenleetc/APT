@@ -408,7 +408,10 @@ classdef Labels
       if isempty(tgts)
         tgts = 1:ntgt;
       else
-        assert(numel(tgts)==ntgt);
+        if numel(tgts)~=ntgt
+          warningNoTrace('Replacing tgts with 1:%d',ntgt);
+          tgts = 1:ntgt;
+        end
       end
       
       nnan = ~isnan(lpos);
