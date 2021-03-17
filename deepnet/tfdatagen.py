@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from itertools import islice
 import time
 
@@ -936,13 +937,15 @@ def montage(ims0, ims0type='batchlast',
             locs=None, locs2=None,
             fignum=1, figsize=(25, 25), axes_pad=0.0,
             share_all=True, label_mode='1', cmap='viridis',
-            do_cb=True, cbclr='g', lbls=None,
+            do_cb=True, cbclr='g', lbls=None, lblcolor='b', lblfontsize=36,
             locsmrkr='.', locs2mrkr='x',
             locsmrkrsz=16, locscmap='jet',
             locsclr=None, locs2clr=None,
             locscent=False,locs2cent=False,
             locscentmrkrsz=90,
             masks=None,maskalpha=0.5,
+            rects=None,  # [nim] list; rects[iim] = [nrects] list of [4] x,y,w,h bboxes
+            rect_lw=2,
             ):
 
     '''
@@ -965,6 +968,8 @@ def montage(ims0, ims0type='batchlast',
 
     do_mask = masks is not None
 
+    do_rects = rects is not None
+
     if ims0type == 'batchfirst':
         ims = np.moveaxis(ims0, 0, -1)
         ims = ims[:, :, 0, :]
@@ -977,6 +982,9 @@ def montage(ims0, ims0type='batchlast',
     nim = ims.shape[2]
     nplotr = int(np.floor(np.sqrt(nim)))
     nplotc = int(np.ceil(nim / nplotr))
+
+    if do_rects:
+        assert len(rects) == nim
 
     fig = plt.figure(fignum, figsize=figsize)
     grid = axg1.ImageGrid(fig, 111,  # similar to subplot(111)
@@ -995,14 +1003,20 @@ def montage(ims0, ims0type='batchlast',
         him.set_clim(0., climmax)
         if do_mask:
             grid[iim].imshow(masks[...,iim], alpha=maskalpha)
+        if do_rects:
+            rthis = rects[iim]
+            for r in rthis:
+                rect = Rectangle((r[0],r[1]),r[2],r[3],linewidth=rect_lw,edgecolor='r',facecolor='none')
+                grid[iim].add_patch(rect)
+
         if do_cb:
             cb = grid.cbar_axes[iim].colorbar(him)
             cb.ax.tick_params(color='r')
             plt.setp(plt.getp(cb.ax, 'yticklabels'), color=cbclr)
         if lbls:
-            grid[iim].text(15, 15, lbls[iim], color='y',
+            grid[iim].text(15, 15, lbls[iim], color=lblcolor,
                            verticalalignment='top',
-                           fontsize=20)
+                           fontsize=lblfontsize)
         if iim == 0:
             cb0 = cb if do_cb else None
         if locs is not None:
