@@ -61,6 +61,9 @@ classdef Labels
     function tf = hasLbls(s)
       tf = ~isempty(s.frm);
     end
+    function n = numLbls(s)
+      n = numel(s.frm);
+    end
     function s = setpFT(s,frm,itgt,xy)
       i = find(s.frm==frm & s.tgt==itgt);
       if isempty(i)
@@ -451,8 +454,7 @@ classdef Labels
       xfcn = @(p)nanmean(p(1:s.npts,:),1);
       yfcn = @(p)nanmean(p(s.npts+1:2*s.npts,:),1);
       
-      
-      for jtgt=1:ntgts        
+      for jtgt=1:ntgts
         iTgt = tgtsUn(jtgt);
         tf = s.tgt==iTgt;
         frms = double(s.frm(tf)); % KB 20201224 - doesn't work if uint32, off should be negative
