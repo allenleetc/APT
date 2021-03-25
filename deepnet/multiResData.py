@@ -654,6 +654,7 @@ def test_crop_patch_trx():
     isz = 6 + np.random.choice(2)
     conf.imsz = [isz, isz]
     conf.img_dim = 1
+    conf.trx_align_theta=False
     ims = np.zeros([18, 18, 1])
     st = 6
     en = 9 + np.random.choice(2)
