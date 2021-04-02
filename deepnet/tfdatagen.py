@@ -953,6 +953,7 @@ def montage(ims0, ims0type='batchlast',
             masks=None,maskalpha=0.5,
             rects=None,  # [nim] list; rects[iim] = [nrects] list of [4] x,y,w,h bboxes
             rect_lw=2,
+            dontshow=False,
             ):
 
     '''
@@ -1020,7 +1021,7 @@ def montage(ims0, ims0type='batchlast',
             cb = grid.cbar_axes[iim].colorbar(him)
             cb.ax.tick_params(color='r')
             plt.setp(plt.getp(cb.ax, 'yticklabels'), color=cbclr)
-        if lbls:
+        if lbls is not None:
             grid[iim].text(15, 15, lbls[iim], color=lblcolor,
                            verticalalignment='top',
                            fontsize=lblfontsize)
@@ -1051,7 +1052,8 @@ def montage(ims0, ims0type='batchlast',
     for iim in range(nim, nplotr * nplotc):
         grid[iim].imshow(np.zeros(ims.shape[0:2]))
 
-    plt.show()
+    if not dontshow:
+        plt.show()
     return fig, grid, cb0
 
 if __name__ == "__main__":
