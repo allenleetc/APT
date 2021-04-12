@@ -2517,7 +2517,8 @@ def classify_db_all(model_type, conf, db_file, model_file=None,
             jpred = PoseTools.json_load(db_file)
             crop_info = jpred['crop_info']
             db_len = len(crop_info)
-            read_fn = tfdatagen.png_generator(crop_info, db_png_dir, conf.n_classes)
+            png_gen = tfdatagen.png_generator(crop_info, db_png_dir, conf.n_classes)
+            read_fn = lambda: next(png_gen)
         elif conf.db_format == 'coco':
             coco_reader = multiResData.coco_loader(conf, db_file, False,img_dir=img_dir)
             read_fn = iter(coco_reader).__next__
