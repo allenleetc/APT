@@ -1056,6 +1056,21 @@ def montage(ims0, ims0type='batchlast',
         plt.show()
     return fig, grid, cb0
 
+def png_generator(crop_info, png_dir, n_cls):
+    # pngs = glob.glob(opj(png_dir, '*_*.png'))
+    for ci in crop_info:
+        frm, tgtndx, x0, y0, x1p1, y1p1 = ci
+        fshort = 'f{:08d}_tgt{:02d}.png'.format(frm, tgtndx)
+        imf = os.path.join(png_dir, fshort)
+        im = cv2.imread(imf, cv2.IMREAD_GRAYSCALE)
+        if im.ndim == 2:
+            im = im[..., np.newaxis]
+        locs = np.zeros((n_cls, 2))
+        ifo = ci
+
+        yield im, locs, ifo
+
+
 if __name__ == "__main__":
 
     # class Timer(object):

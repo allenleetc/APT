@@ -28,6 +28,7 @@ import imageio
 import multiResData
 from multiResData import float_feature, int64_feature,bytes_feature,trx_pts, check_fnum
 # from multiResData import *
+import tfdatagen
 import leap.training
 from leap.training import train as leap_train
 #import open_pose as op
@@ -2504,7 +2505,16 @@ def classify_db_all(model_type, conf, db_file, model_file=None,
         pred_locs, label_locs, info = ret[:3]
         close_fn()
     else:
-        if conf.db_format == 'coco':
+        if conf.db_format == 'png':
+            json_suffix = '.pred.json'
+            assert db_file.endswith(json_suffix)
+            db_base = db_file[:-len(json_suffix)]
+            db_png_dir = db_base + ".ims"
+            jpred = PoseTools.json_load(db_file)
+            crop_info = jpred['crop_info']
+            db_len = len(crop_info)
+            read_fn = tfdatagen.png_generator(crop_info, db_png_dir, conf.n_classes)
+        elif conf.db_format == 'coco':
             coco_reader = multiResData.coco_loader(conf, db_file, False,img_dir=img_dir)
             read_fn = iter(coco_reader).__next__
             db_len = len(coco_reader)
