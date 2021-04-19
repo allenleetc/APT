@@ -948,6 +948,7 @@ def montage(ims0, ims0type='batchlast',
             locsmrkr='.', locs2mrkr='x',
             locsmrkrsz=16, locscmap='jet',
             locsclr=None, locs2clr=None,
+            locslw=1.5, locs2lw=1.5,
             locscent=False,locs2cent=False,
             locscentmrkrsz=90,
             masks=None,maskalpha=0.5,
@@ -1033,7 +1034,7 @@ def montage(ims0, ims0type='batchlast',
             locsc = locsclr if locsclr is not None \
                 else jetmap(np.linspace(0, 1, locs.shape[1]))
             grid[iim].scatter(locs[iim, :, 0], locs[iim, :, 1], c=locsc,
-                              marker=locsmrkr, s=locsmrkrsz)
+                              marker=locsmrkr, s=locsmrkrsz, linewidth=locslw)
             if locscent:
                 xc = np.mean(locs[iim,...],axis=0)
                 grid[iim].scatter(xc[0],xc[1],c=locsc,marker='o',s=locscentmrkrsz)
@@ -1044,7 +1045,8 @@ def montage(ims0, ims0type='batchlast',
                 else jetmap(np.linspace(0, 1, locs2.shape[1]))
             grid[iim].scatter(locs2[iim, :, 0], locs2[iim, :, 1],
                               c=locsc,
-                              marker=locs2mrkr, s=locsmrkrsz)
+                              marker=locs2mrkr, s=locsmrkrsz,
+                              linewidth=locs2lw)
             if locs2cent:
                 xc = np.mean(locs2[iim,...],axis=0)
                 grid[iim].scatter(xc[0],xc[1],c=locsc,marker='o',s=locscentmrkrsz)
