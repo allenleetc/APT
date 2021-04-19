@@ -8821,6 +8821,9 @@ classdef Labeler < handle
       % fixed-radius roi, centered on kp centroid
       % xy: [npt x 2]
       % roi: [4x2]
+      %
+      % Note: xy can be either 0b or 1b, with roi reported accordingly
+      
       xymu = nanmean(xy,1);
       xlo = xymu(1)-rad;
       xhi = xymu(1)+rad;
@@ -8833,6 +8836,11 @@ classdef Labeler < handle
       %  bbox by scalefac*bbox
       % xy: [npt x 2]
       % roi: [4x2]
+      %
+      % Note: xy can be either 0b or 1b, with roi reported accordingly
+      % Note: roi edges are conceptually infinitely thin (vs eg having pixel width)
+      %   Therefore roi high-coordinates are not "one past"
+      
       xymin = min(xy,[],1);
       xymax = max(xy,[],1);
       xyrad = scalefac * (xymax-xymin)/2 + fixedmargin;
