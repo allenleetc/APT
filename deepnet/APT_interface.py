@@ -2519,6 +2519,14 @@ def classify_db_all(model_type, conf, db_file, model_file=None,
             db_len = len(crop_info)
             png_gen = tfdatagen.png_generator(crop_info, db_png_dir, conf.n_classes)
             read_fn = lambda: next(png_gen)
+        elif conf.db_format == 'png2':
+            imsz = conf.imsz
+            assert imsz[0] == imsz[1]
+            im_diam = imsz[0]-1
+            assert im_diam//2 == im_diam/2
+            crop_rad = im_diam//2
+            png_gen = tfdatagen.png_generator2(db_file, crop_rad, conf.n_classes)
+            read_fn = lambda: next(png_gen)
         elif conf.db_format == 'coco':
             coco_reader = multiResData.coco_loader(conf, db_file, False,img_dir=img_dir)
             read_fn = iter(coco_reader).__next__

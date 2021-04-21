@@ -1072,6 +1072,46 @@ def png_generator(crop_info, png_dir, n_cls):
 
         yield im, locs, ifo
 
+def png_generator2(json_file, crop_rad, n_cls):
+    '''
+    No image/png/crop dir. json specifies full imagefilename and boxes to crop.
+    '''
+
+    jpred = PoseTools.json_load(json_file)
+    im_files = jpred['image_filename']
+    n_ims = len(im_files)
+    boxes = jpred['boxes']
+    assert n_ims == len(boxes)
+    nboxes = np.sum(np.array([len(x) for x in boxes]))
+    print("Loaded detpred json: {}".format(json_file))
+    print("{} prediction boxes over {} images.".format(nboxes, n_ims))
+
+    r = crop_rad
+
+    for imidx, (imf, bbs_im) in enumerate(zip(im_files, boxes)):
+        im = cv2.imread(imf, cv2.IMREAD_GRAYSCALE)
+        impad = np.pad(im, r)
+        if impad.ndim == 2:
+            impad = impad[..., np.newaxis]
+        locs = np.zeros((n_cls, 2))
+
+        # iterate over pred_boxes for this im
+        for bbidx, bb in enumerate(bbs_im):
+            x0, y0, x1, y1 = bb
+            xc = (x0 + x1) / 2.0
+            yc = (y0 + y1) / 2.0
+            xc = int(xc)
+            yc = int(yc)
+            if xc < r or yc < r or xc > im.shape[1] - r - 1 or yc > im.shape[0] - r - 1:
+                print("im {}, det {}: crop requires padding. xc,yc={},{}.".format(imidx, bbidx, xc, yc))
+
+            xcpad = xc + r  # x/centroid in impad
+            ycpad = yc + r  # etc
+            imcrop = impad[ycpad - r:ycpad + r + 1, xcpad - r:xcpad + r + 1, ...]
+            ifo = [imidx, bbidx, xc, yc]
+
+            yield imcrop, locs, ifo
+
 
 if __name__ == "__main__":
 
