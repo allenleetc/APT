@@ -1100,8 +1100,8 @@ def png_generator2(json_file, crop_rad, n_cls):
             x0, y0, x1, y1 = bb
             xc = (x0 + x1) / 2.0
             yc = (y0 + y1) / 2.0
-            xc = int(xc)
-            yc = int(yc)
+            xc = int(np.round(xc))
+            yc = int(np.round(yc))
             if xc < r or yc < r or xc > im.shape[1] - r - 1 or yc > im.shape[0] - r - 1:
                 print("im {}, det {}: crop requires padding. xc,yc={},{}.".format(imidx, bbidx, xc, yc))
 
