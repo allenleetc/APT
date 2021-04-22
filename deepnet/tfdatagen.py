@@ -1079,6 +1079,8 @@ def png_generator2(json_file, crop_rad, n_cls):
 
     jpred = PoseTools.json_load(json_file)
     im_files = jpred['image_filename']
+    if 'image_dir' in jpred:
+        im_files = [os.path.join(jpred['image_dir'], x) for x in im_files]
     n_ims = len(im_files)
     boxes = jpred['boxes']
     assert n_ims == len(boxes)
