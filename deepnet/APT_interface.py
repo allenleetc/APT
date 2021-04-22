@@ -185,6 +185,8 @@ def convert(in_data,to_python):
         out_data = {}
         for i in in_data.keys():
             out_data[i] = convert(in_data[i],to_python)
+    elif type(in_data) is str:
+        out_data = in_data
     elif in_data is None:
         out_data = None
     else:
