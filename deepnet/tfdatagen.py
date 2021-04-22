@@ -1110,7 +1110,7 @@ def png_generator2(json_file, crop_rad, n_cls):
             xcpad = xc + r  # x/centroid in impad
             ycpad = yc + r  # etc
             imcrop = impad[ycpad - r:ycpad + r + 1, xcpad - r:xcpad + r + 1, ...]
-            ifo = [imidx, bbidx, xc, yc]
+            ifo = [imidx, bbidx, xc, yc, os.path.basename(imf)]
 
             yield imcrop, locs, ifo
 
