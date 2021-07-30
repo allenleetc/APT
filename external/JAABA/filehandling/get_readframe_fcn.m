@@ -137,8 +137,8 @@ elseif strcmpi(ext,'.bag'),
  [readframe,nframes,fid,headerinfo] = bag_get_readframe_fcn(filename,varargin{:});
 elseif strcmpi(ext,'.mat'),
   videofiletype = load(filename,'videofiletype');
-  switch videofiletype,
-    
+  videofiletype = videofiletype.videofiletype;
+  switch videofiletype,    
     case 'SingleLarvaTracker',
       videodata = load(filename);
       readframe = @(f) ReadSingleLarvaTrackerFrame(f,videodata.firstframeim,videodata.imraw,videodata.finalbbox,videodata.fps,varargin{:});
@@ -147,6 +147,14 @@ elseif strcmpi(ext,'.mat'),
       [nr,nc,~] = size(firstframeim);
       headerinfo = struct('nr',nr,'nc',nc,'nframes',nframes,'bgcenter',firstframeim,...
         'type','SingleLarvaTracker');
+      
+    case 'imstack'
+      videodata = load(filename);
+      [nr,nc,nframes] = size(videodata.dat);
+      readframe = @(f)videodata.dat(:,:,f);
+      fid = 0;
+      headerinfo = struct('nr',nr,'nc',nc,'nframes',nframes,'type','imstack');
+      
     otherwise
       error('Do not know how to parse mat file of type %s',videofiletype);
   end
