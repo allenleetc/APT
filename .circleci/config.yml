@@ -13,19 +13,20 @@ jobs:
       image: 'ubuntu-1604:201903-01'
     steps:
       - checkout
-      - run: |
-          sudo apt-get update -y && sudo apt-get install --no-install-recommends -y libgstreamer1.0-0 \
-            gstreamer1.0-tools \
-            gstreamer1.0-libav \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good \
-            gstreamer1.0-plugins-bad \
-            gstreamer1.0-plugins-ugly	    
-      - matlab/install
-      - run: docker pull bransonlabapt/apt_docker:tf23_mmdetection
+#      - run: |
+#          sudo apt-get update -y && sudo apt-get install --no-install-recommends -y libgstreamer1.0-0 \
+#            gstreamer1.0-tools \
+#            gstreamer1.0-libav \
+#            gstreamer1.0-plugins-base \
+#            gstreamer1.0-plugins-good \
+#            gstreamer1.0-plugins-bad \
+#            gstreamer1.0-plugins-ugly
+#      - matlab/install
+#      - run: docker pull bransonlabapt/apt_docker:tf23_mmdetection
       - run: docker images
       - run: ls -la
       - run: pwd
+      - run: export DOCKER_API_VERSION=1.40; docker run -it --name thename --rm --network host --user $(id -u) --mount 'type=bind,src=/home/circleci,dst=/home/circleci'  bransonlabapt/apt_docker:tf23_mmdetection python deepnet/APT_interface.py foo test hello
       #- matlab/run-command:
       #    command: makehorseproj
 
