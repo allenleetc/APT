@@ -23,5 +23,5 @@ jobs:
             gstreamer1.0-plugins-ugly
       - matlab/install
       - matlab/run-command:
-          command: videoreadertest
+          command: makehorseproj
 

@@ -1,5 +1,5 @@
 function makehorseproj(varargin)
-mov = 'xylophone.mat';
+mov = 'horse.mov';
 lObj = StartAPT;
 cfg = Labeler.cfgGetLastProjectConfigNoView;
 cfg.NumLabelPoints = 3;
