@@ -20,5 +20,5 @@ jobs:
       #- run: sudo apt-get install gstreamer0.10-plugins-good
       - matlab/install
       - matlab/run-command:
-          command: videoreadertest
+          command: makehorseproj
 
