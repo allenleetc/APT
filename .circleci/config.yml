@@ -26,7 +26,7 @@ jobs:
       - run: docker images
       - run: ls -la
       - run: pwd
-      - run: export DOCKER_API_VERSION=1.40; docker run -it --name thename --rm --network host --user $(id -u) --mount 'type=bind,src=/home/circleci,dst=/home/circleci'  bransonlabapt/apt_docker:tf23_mmdetection python /home/circleci/project/deepnet/APT_interface.py foo test hello
+      - run: export DOCKER_API_VERSION=1.40; docker run -it --name thename --rm --network host --user $(id -u) --mount 'type=bind,src=/home/circleci,dst=/home/circleci'  bransonlabapt/apt_docker:tf1.15_py3_20201027 python /home/circleci/project/deepnet/APT_interface.py foo test hello
       #- matlab/run-command:
       #    command: makehorseproj
 
