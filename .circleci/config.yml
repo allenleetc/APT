@@ -13,6 +13,11 @@ jobs:
       image: 'ubuntu-1604:201903-01'
     steps:
       - checkout
+      - run: sudo add-apt-repository ppa:mc3man/gstffmpeg-keep
+      - run: sudo apt-get update 
+      - run: sudo apt-get install gstreamer0.10-ffmpeg
+      - run: sudo apt-get install gstreamer0.10-tools
+      - run: sudo apt-get install gstreamer0.10-plugins-good
       - matlab/install
       - matlab/run-command:
           command: makehorseproj
