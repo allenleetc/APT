@@ -20,8 +20,10 @@ jobs:
             gstreamer1.0-plugins-base \
             gstreamer1.0-plugins-good \
             gstreamer1.0-plugins-bad \
-            gstreamer1.0-plugins-ugly
+            gstreamer1.0-plugins-ugly	    
       - matlab/install
-      - matlab/run-command:
-          command: makehorseproj
+      - run: docker pull bransonlabapt/apt_docker:tf23_mmdetection
+      - run: docker images
+      #- matlab/run-command:
+      #    command: makehorseproj
 
