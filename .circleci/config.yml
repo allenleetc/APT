@@ -15,5 +15,5 @@ jobs:
       - checkout
       - matlab/install
       - matlab/run-command:
-          command: myscript
+          command: makehorseproj
 

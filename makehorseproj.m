@@ -1,5 +1,5 @@
 function makehorseproj(varargin)
-mov = varargin{1};
+mov = 'horse.mov';  
 lObj = StartAPT;
 cfg = Labeler.cfgGetLastProjectConfigNoView;
 cfg.NumLabelPoints = 3;
